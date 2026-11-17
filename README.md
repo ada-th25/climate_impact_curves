@@ -460,9 +460,69 @@ intensity reasonably, or explicitly scope the resulting curve as valid
 only in ERA5's resolvable intensity range.
 
 **Status**: wind dataset and pilot event decided, access path working,
-timing-validated. Magnitude caveat flagged, not yet resolved. Next step
-not yet started: pull the in-house or CCI biomass data for this same
-Florida Panhandle AOI/window and repeat the before/after loss-map method.
+timing-validated. Magnitude caveat flagged, not yet resolved.
+
+## 14. Florida biomass pull: AOI placement and the logging/salvage confound
+
+Pulled CCI AGB (2017 vs. 2019, bracketing Michael's Oct 2018 landfall) for
+an initial Florida Panhandle AOI (lon -85.6 to -84.9, lat 30.0 to 30.6),
+chosen from county names associated with documented timber damage
+(Bay, Calhoun, Liberty, Jackson). Raw and aggregated (~1km, ~5km, ~25km)
+loss maps showed only weak, diffuse signal with no coherent storm-damage
+swath - unlike Sierra, the noise visibly shrank with aggregation rather
+than persisting (evidence against a systematic terrain-type bias here,
+consistent with Florida's flat terrain), but also no clear real signal
+emerged.
+
+**Checked AOI placement against actual damage data**: Florida Forest
+Service classed Bay, Calhoun and Gulf counties as ~347,000 acres at 95%
+("catastrophic") damage - the original AOI covered Bay and part of
+Calhoun but missed Gulf County (just south of the original bbox) and
+most of Liberty (just east). Picking counties from memory rather than
+checking a damage map first was the issue. **Widened/shifted the AOI**
+to lon -85.7 to -84.6, lat 29.6 to 30.6 to cover Bay, Gulf, Calhoun and
+part of Liberty. Re-ran the same CCI pull/aggregation - result was
+similarly weak and diffuse, not materially better. AOI placement was not
+the main problem.
+
+**Checked against Hansen `lossyear` instead** (reusing the same
+cross-check method validated for drought, Section 6) - chosen because
+Hansen is tuned to abrupt canopy-cover loss, a better match for sudden
+wind damage than it was for drought's slower dieback. Result: 2018 shows
+4.08% of the (v2) bbox with detected canopy loss, clearly above a
+2016/2017 baseline of ~1.8-2.1%, and 2019 is higher still (5.03%).
+
+**New confound, specific to storm (not previously relevant for drought
+at this site): routine timber harvest.** This AOI is intensively managed
+Southern pine plantation land, clearcut on short (15-25 year) rotations
+regardless of storms - Hansen's `lossyear` cannot distinguish storm
+damage from ordinary logging, and the 2018 loss map's shape (a dense,
+branching, scattered network, not one contiguous swath) looks more
+consistent with harvest patterns than a single storm's footprint.
+
+**Why 2019 being higher than 2018 does not undermine the finding**:
+plausibly real - Hansen's detection can lag damage into the following
+year depending on post-storm imagery availability, and major hurricanes
+typically trigger a wave of **salvage logging** the following year
+(clearing storm-damaged timber before it rots/becomes a pest risk),
+which itself counts as storm-attributable loss, just indirect. The
+likely real picture: storm-attributable disturbance is elevated above
+the ~2% baseline in *both* 2018 and 2019, not concentrated in a single
+clean year - which also explains why the straight 2017-vs-2019 CCI
+difference looked weak: the true signal is spread across two years and
+layered on top of both Hansen's routine-harvest noise floor and CCI's
+own known pixel-level noisiness (Section 6).
+
+**Status**: real storm-attributable disturbance likely present (2018 and
+2019 both ~2x the pre-storm baseline), but not cleanly isolable with a
+single before/after year pair the way the Sierra drought pilot assumed
+for CCI. Decision not yet made: whether to use 2017 vs. a later year
+(e.g. 2020) to capture the full storm-plus-salvage window, or treat the
+2018+2019 excess-over-baseline itself as the event's disturbance
+footprint. Either way, the plantation-logging confound needs an explicit
+control/placebo check (e.g. comparing against a nearby, undamaged
+plantation region with the same land-use pattern) before trusting any
+resulting curve, mirroring the discipline already planned in Section 1.
 
 ## Related work (literature review, 2026-11-17)
 
@@ -533,6 +593,11 @@ already done elsewhere.
    a single-tile sub-region (Section 12) - ruling out AOI size/shape as a
    fix for CCI specifically, independent of how the in-house model's
    single-tile test turns out.
+10. Storm pilot's biomass signal (Section 14) is confounded by routine
+    plantation logging/salvage harvest, not cleanly isolable with a
+    single before/after year pair - needs a decision on year-pair choice
+    and a control/placebo check against undamaged plantation land before
+    trusting any curve.
 
 ## References
 
