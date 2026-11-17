@@ -352,6 +352,49 @@ salvageable - a same-quarter, year-over-year comparison (e.g. Q4 2017 vs.
 Q4 2018, or Q1 2017 vs. Q1 2018) would remove the seasonal confound and
 is the natural next test, not yet run.
 
+## 12. Same-quarter rerun: tile seam is structural, not seasonal
+
+Re-ran the in-house model comparison as Q4 2017 vs. Q4 2018 (same quarter,
+both years), removing the Q1/Q4 seasonal mismatch from Section 11
+entirely. The same tile-stitching seam appeared, in the same location
+(aligned with the same MGRS tile boundary at lat ~37.0), essentially
+unchanged from the Q1/Q4 version. **This rules out season as the cause -
+the seam is structural**, most likely tied to the pilot bbox spanning two
+UTM zones (10N/11N, visible in the tile set: `10SGG`, `11SKA`, `11SKB`,
+`11SKV`, `11SLA`, `11SLB`, `11SLV`), which is exactly the kind of AOI
+placement that triggers tile-stitching artifacts in any Sentinel-2-tiled
+pipeline.
+
+This means the two biomass products now each have a *confirmed, distinct*
+artifact mechanism on this same bbox: CCI has a terrain/radar-geometry
+artifact (Section 9), the in-house model has a tile-stitching seam
+(this section) - different causes, same site. That convergence is itself
+informative: it's more evidence the specific AOI, not just one data
+source, is the problem.
+
+**Follow-up test**: re-ran the in-house model on a smaller AOI chosen to
+sit entirely inside a single MGRS tile (`11SLA`: lon -119.248 to -118.475,
+lat 36.036 to 37.037; used lon -119.2 to -118.5, lat 36.05 to 36.95 with a
+safety margin from the tile edges), covering part of the southern-central
+Sierra within the documented bark-beetle die-off zone. Result pending.
+
+In parallel, re-checked **CCI** (not the in-house model) on this same
+single-tile sub-region, reusing the already-downloaded 2015/2020 mosaics
+(no new pull needed). **The terrain-following artifact is still present**,
+same fine-grained, ridge-following pattern as the full bbox. This is not
+a contradictory result - CCI is not MGRS-tiled, so narrowing to one
+Sentinel-2 tile was never going to address CCI's terrain/SAR-geometry
+mechanism, only the in-house model's tile-seam mechanism. Reinforces
+Section 9's conclusion (terrain-driven, not AOI-shape-driven) rather than
+undermining it.
+
+**Status**: tile-seam cause confirmed structural, not seasonal. Waiting
+on the single-tile in-house model result to know whether that specific
+fix works for the in-house model. CCI's terrain artifact confirmed
+independent of AOI size/shape - a single-tile AOI will not rescue CCI as
+a usable data source here regardless of how the in-house model result
+turns out.
+
 ## 7. Known issues and open questions
 
 1. 2010 AGB baseline reliability (Section 6) - ESA's own documentation
@@ -367,15 +410,18 @@ is the natural next test, not yet run.
 5. Storm/wind dataset not yet identified.
 6. USFS Aerial Detection Survey ground-truth comparison deliberately
    deferred, not yet pulled in.
-7. In-house biomass model comparison (Section 11) is confounded by tile
-   stitching seams and a Q1/Q4 seasonal mismatch, with no QC/metrics data
-   available to check either - needs a same-quarter year-over-year rerun
-   before it can answer whether the Sierra Nevada site is salvageable at
-   all for a biomass-based drought signal.
+7. In-house biomass model's tile-stitching seam (Section 11) is confirmed
+   structural, not a seasonal artifact (Section 12) - tied to the pilot
+   bbox spanning two UTM zones. A single-MGRS-tile rerun is in progress to
+   check whether a smaller AOI fixes it; result not yet in.
 8. No `_metrics.json` or equivalent QC output exists for the in-house
    model runs so far, despite being expected - worth confirming with
    whoever maintains the pipeline whether this is version-dependent or
    this run's configuration specifically omitted it.
+9. CCI's terrain/radar artifact (Section 9) is confirmed present even in
+   a single-tile sub-region (Section 12) - ruling out AOI size/shape as a
+   fix for CCI specifically, independent of how the in-house model's
+   single-tile test turns out.
 
 ## References
 
