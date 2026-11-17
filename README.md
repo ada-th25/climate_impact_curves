@@ -395,6 +395,114 @@ independent of AOI size/shape - a single-tile AOI will not rescue CCI as
 a usable data source here regardless of how the in-house model result
 turns out.
 
+## 13. Storm track started: wind dataset decided, first sanity check passed (with a caveat)
+
+Decided the wind-intensity metric for storm: **ERA5 10m instantaneous wind
+gust (`i10fg`)**, not IBTrACS. IBTrACS only covers tropical cyclones and
+records sustained wind, not gust, which is what actually drives
+windthrow; it would also miss extratropical windstorms entirely, the
+dominant tree-damage mechanism outside the tropics. ERA5 gust is global,
+hourly, and the basis of the closest existing precedent found (C3S's
+European windstorm-footprint product, which defines a storm footprint as
+max gust per cell over a 72-hour passage window). No published, validated
+chain from ERA5 gust directly to a tree-mortality/windthrow curve was
+found in the literature search below - this is new synthesis for this
+project, not reuse of an existing method.
+
+**Pilot event chosen**: Hurricane Michael (Oct 2018), Florida Panhandle -
+Category 5 landfall, ~3M acres of documented timber damage (USFS Southern
+Research Station, Florida Forest Service), falls inside both CCI's and
+the in-house model's reliable windows, pine-dominated and relatively flat
+terrain (avoids the SAR/terrain-artifact problem found in the Sierra
+pilot).
+
+**Access path, new for this project**: the gust variable is not available
+via Earth Engine at all (its ERA5 catalog entries only carry mean u/v
+wind components, and are dated through mid-2020 anyway) - it only exists
+in the **ARCO-ERA5** public Zarr archive on GCS
+(`gs://gcp-public-data-arco-era5`). Checked via `gsutil ls` (safe, no
+memory risk) before touching `xarray`: the smaller, curated `co/` stores
+(`single-level-reanalysis`, `single-level-forecast`, `single-level-surface`)
+do **not** contain gust at all - only the full `ar/full_37-1h-0p25deg-
+chunk-1.zarr-v3` archive (37 variables, decades of global hourly data)
+has both `instantaneous_10m_wind_gust` and
+`10m_wind_gust_since_previous_post_processing`. Opening this store
+wholesale with `xr.open_zarr(..., consolidated=True)` crashed the
+Workbench kernel outright. Fix: open just the one needed variable (plus
+`latitude`/`longitude`/`time` coordinate arrays) directly via the
+lower-level `zarr` library, bypassing xarray's whole-store metadata
+parse entirely - confirmed this is lazy/safe, then sliced only a small
+bbox x 3-day window before pulling any data into memory. Coordinate
+conventions confirmed empirically: latitude descending (90 to -90),
+longitude in 0-360 format (not -180/180), time as hours since
+1900-01-01.
+
+**Sanity check result**: pulled Florida Panhandle gust for Oct 9-11,
+2018. Peak gust 37.7 m/s at **2018-10-10 15:00 UTC** - timing matches
+Michael's documented landfall (~17:30 UTC same day near Mexico Beach)
+closely, confirming the indexing/coordinate-conversion pipeline is
+correct. **Magnitude does not match**: Michael's documented sustained
+wind at landfall was ~69 m/s (155 mph, Category 5), well above the 37.7
+m/s peak found here. Not a bug - a known, literature-flagged limitation:
+ERA5's 0.25 deg (~28km) grid cannot resolve the tight eyewall of an
+intense, compact tropical cyclone, so it systematically underestimates
+peak TC intensity. Directly analogous to the CCI and in-house-model
+artifacts: a real, documented data-source limitation that needs stating
+explicitly, not something to quietly work around.
+
+**Implication for curve-fitting, not yet acted on**: fitting a windthrow
+curve directly against raw ERA5 gust would systematically underestimate
+true wind intensity for compact, intense storms (hurricanes especially).
+Options, not yet decided: bias-correct ERA5 gust against station/
+best-track data (e.g. HURDAT2) for the most intense events, restrict the
+storm pilot to weaker/larger-footprint events where ERA5 resolves
+intensity reasonably, or explicitly scope the resulting curve as valid
+only in ERA5's resolvable intensity range.
+
+**Status**: wind dataset and pilot event decided, access path working,
+timing-validated. Magnitude caveat flagged, not yet resolved. Next step
+not yet started: pull the in-house or CCI biomass data for this same
+Florida Panhandle AOI/window and repeat the before/after loss-map method.
+
+## Related work (literature review, 2026-11-17)
+
+Checked for existing published curves/functions before building our own,
+per request. **No existing work is directly usable as a drop-in curve
+for either hazard** - summarized per-hazard below; full citations in
+References.
+
+**Drought**: Greenwood et al. (2017) (already cited below) gives a
+cross-biome meta-analysis slope (log-mortality increases ~0.46 per SPEI
+unit), consistent across biomes and between gymnosperms/angiosperms -
+useful as a plausibility benchmark for a fitted curve's slope, not a
+ready biomass-loss function, and not tied to remote-sensing inputs.
+Subedi et al. (2021, East Texas) pairs FIA inventory data with a 12-month
+SPEI threshold of -1.0 and reports biomass loss directly, closer in
+structure to this project's output, but specific to East Texas plots, not
+directly transferable to a Sierra Nevada conifer forest or to
+satellite-derived AGB inputs. No one has published a direct
+SPEI-to-biomass-loss-fraction function.
+
+**Storm**: Anyomi et al. (2017) used the ForestGALES_BC mechanistic model
+to simulate windthrow across wind speeds in boreal Ontario (~0-20% damage
+at 5 m/s, 2-90% at 20 m/s, 10-100% at 40 m/s, varying strongly by stand
+type). ForestGALES itself (Gardiner et al.) is the established
+alternative approach in this field - physics-based (tree size/allometry/
+wind-loading), fundamentally different from this project's empirical
+curve-fitting method, not a function to import. The functional form of
+empirical storm-damage curves is itself unsettled in the literature (one
+source notes a reviewer explicitly challenged a sigmoid damage function
+as unjustified) - this project's curve-shape choice is not obviously
+wrong by not matching an established convention, but isn't backed by
+consensus either.
+
+**Conclusion**: the literature confirms the general approach (empirical
+intensity-to-loss curve, fit per event) is reasonable and gives benchmark
+ranges to sanity-check fitted curves against later, but building the
+actual curves - tied to this project's specific data sources, forest
+types, and intensity metrics - is genuine synthesis, not something
+already done elsewhere.
+
 ## 7. Known issues and open questions
 
 1. 2010 AGB baseline reliability (Section 6) - ESA's own documentation
@@ -407,7 +515,10 @@ turns out.
    (2011-2014 missing), not freely chosen (Section 5).
 4. 2010-2012 disturbance contamination in the pilot bbox not yet checked
    (Section 5).
-5. Storm/wind dataset not yet identified.
+5. Storm/wind dataset decided (ERA5 gust, Section 13) and timing-validated
+   against Hurricane Michael, but ERA5's ~28km grid systematically
+   underestimates peak intensity for compact, intense storms - not yet
+   resolved how this should affect curve-fitting scope or bias-correction.
 6. USFS Aerial Detection Survey ground-truth comparison deliberately
    deferred, not yet pulled in.
 7. In-house biomass model's tile-stitching seam (Section 11) is confirmed
@@ -433,3 +544,10 @@ turns out.
   doi:10.5285/95913ffb6467447ca72c4e9d8cf30501.
 - Beguería, S., Vicente-Serrano, S., Reig, F., Latorre, B. (2014). SPEI
   global 0.5deg monthly dataset.
+- Subedi, S.C. et al. (2021). Tree mortality and biomass loss in
+  drought-affected forests of East Texas, USA. *Journal of Forestry
+  Research* 32(1), 67-80. doi:10.1007/s11676-020-01106-w.
+- Anyomi, K.A. et al. (2017). Windthrow modelling in boreal Ontario using
+  ForestGALES_BC.
+- Gardiner, B. et al. (2016). Review of wind damage to forests.
+  (ForestGALES mechanistic wind-damage model.)
