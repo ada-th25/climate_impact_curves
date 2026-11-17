@@ -395,6 +395,44 @@ independent of AOI size/shape - a single-tile AOI will not rescue CCI as
 a usable data source here regardless of how the in-house model result
 turns out.
 
+**Single-tile result (2026-11-17): the fix did not work.** The
+single-tile AOI (fully inside `11SLA`'s own bounds) still pulled 6
+distinct MGRS tiles in its Sentinel-2 composite (`11SKA`, `11SKB`,
+`11SKV`, `11SLA`, `11SLB`, `11SLV` - the same set as the original
+problematic run, minus `10SGG`), confirmed by listing the actual
+composite filenames rather than trusting the tile *count* alone. The
+pipeline's tile-selection logic evidently works from some
+buffered/padded search area rather than strict AOI-polygon containment,
+and Sentinel-2 tiles overlap at their edges by design - so even an AOI
+placed centrally within one tile's bounds still pulls in all its
+neighbors. Shrinking the AOI, as attempted, cannot produce a seam-free
+result from this pipeline; a real fix would need either a pipeline-level
+change (outside this project's control) or clipping to one tile's
+footprint *after* a full multi-tile pull, accepting a smaller usable
+area.
+
+**Conclusion: the in-house model avenue for the Sierra Nevada site is
+exhausted.** Two independent biomass products have now failed for this
+specific site through two genuinely different mechanisms - CCI's
+terrain/radar-geometry artifact (Sections 6-9, tied to the site's steep
+terrain) and the in-house model's tile-stitching seam (Sections 11-12,
+tied to the site's bbox straddling multiple Sentinel-2 tile boundaries,
+itself a consequence of the site spanning two UTM zones). Both failures
+trace back to properties of this specific site's geography, not to a
+fundamental impossibility of building a drought curve at all - see the
+options below.
+
+**Next steps, not yet started**: (1) pull USFS Aerial Detection Survey
+ground truth directly (already planned since Section 4, bypasses
+satellite biomass differencing entirely); (2) check whether a published,
+field-validated remote-sensing mortality map already exists for the
+California 2012-2016 bark-beetle drought specifically, mirroring the
+approach that worked for the storm pilot (Section 18's St. Peter et al.
+dataset) rather than continuing to derive a signal from general-purpose
+biomass products; (3) as a fallback, move the drought pilot to a
+different, flatter, single-tile site - the grids/curves methodology
+itself is reusable, only the pilot site/event would change.
+
 ## 13. Storm track started: wind dataset decided, first sanity check passed (with a caveat)
 
 Decided the wind-intensity metric for storm: **ERA5 10m instantaneous wind
@@ -524,6 +562,206 @@ control/placebo check (e.g. comparing against a nearby, undamaged
 plantation region with the same land-use pattern) before trusting any
 resulting curve, mirroring the discipline already planned in Section 1.
 
+## 15. Placebo check confirms the Florida spike is storm-attributable, not routine logging
+
+Ran the control/placebo check flagged as needed at the end of Section
+14: pulled the same Hansen `lossyear` check for a nearby pine-plantation
+region in Georgia (lon -83.5 to -82.8, lat 31.0 to 31.6 - Tifton/Valdosta
+area), chosen for similar forest type and harvest practice but outside
+Michael's damage path, rather than assuming the comparison would hold
+without checking it.
+
+**Result: clean pass.** The control region shows a flat ~1.6-2.1% canopy
+loss baseline across 2016-2019, with no 2018/2019 elevation - if
+anything, slightly *lower* in those years. This is the opposite of
+Florida's pattern (4.08% in 2018, 5.03% in 2019, both roughly double its
+own 2016/2017 baseline of ~1.8-2.1%).
+
+This rules out the alternative explanation flagged in Section 14 (a
+region-wide logging/market trend that happened to coincide with the
+storm by chance) - since a same-forest-type, same-practice control region
+shows no such spike, Florida's elevated 2018/2019 loss is very likely
+genuinely storm-attributable (direct wind damage plus the salvage-logging
+wave that typically follows a major hurricane), not routine harvest
+noise.
+
+**Status**: the "is this real storm damage or just logging noise"
+question from Section 14 is resolved - it's real. The separate,
+still-open question (which year pair or framing to use for a clean
+before/after comparison, given the signal spans both 2018 and 2019) is
+unchanged by this result and still needs deciding before building a
+curve.
+
+## 16. Year-pair decision: 2017 vs. 2020, not excess-over-baseline
+
+Decided to use **2017 (before) vs. 2020 (after)** as the storm pilot's
+biomass comparison pair, rather than trying to build a curve from the
+2018+2019 excess-over-baseline Hansen signal (Section 14-15).
+
+**Reasoning**: Hansen's `lossyear` only gives a binary per-pixel
+disturbance flag, not a continuous biomass amount - useful for the
+diagnostic/placebo checks just done, but translating "excess
+disturbance-year fraction over baseline" into an actual loss-share
+magnitude would mean inventing a storm-specific methodology, rather than
+reusing the one already built (`loss share = (AGB_before - AGB_after) /
+AGB_before`, logistic fit). A 2017-to-2020 CCI comparison captures the
+full storm-plus-salvage disturbance window (both 2018's direct damage
+and 2019's salvage logging) in one differencing step, using the existing
+method unchanged.
+
+There is direct precedent for this kind of tradeoff: Section 6 made the
+same call for drought, accepting a less temporally precise comparison
+(no true pre-drought baseline, settled for 2015-2020) over fighting for
+perfect event isolation.
+
+**Known tradeoff, not yet checked**: widening the window to three years
+(2017-2020) increases the risk of unrelated disturbance - further
+harvest/replanting cycles, anything else unrelated to Michael - creeping
+into the "after" mosaic. Same class of contamination risk already
+flagged for drought's 2010-2012 window (known issue 4). Deferred until
+there's an actual curve to validate against, same as that drought-side
+check remains deferred.
+
+**Next step**: pull CCI AGB 2017 and 2020 for the Florida Panhandle AOI
+and repeat the before/after loss-map method validated for drought.
+
+## 17. CCI 2017-2020 shows a plausible signal, but cross-check against Hansen is inconclusive - pivoting to a validated external dataset
+
+Ran the 2017-2020 CCI comparison decided in Section 16. Unlike the
+2017-2019 version (Section 14), the loss pattern **strengthened rather
+than washing out** under spatial aggregation (~1km to ~5km) - a
+spatially coherent loss-dominated region emerged, the opposite behavior
+from both the Sierra terrain artifact (persisted unchanged at all
+scales) and the earlier Florida attempt (shrank to near-zero). On its
+own, encouraging.
+
+**Cross-checked against Hansen's 2018+2019 disturbance mask** (the same
+one used for the placebo check, Section 14-15) to see if the two
+independent signals spatially agreed. **They did not line up cleanly** -
+Hansen's heaviest disturbance concentrates in the left-center of the
+bbox, CCI's strongest apparent loss concentrates center-right, with only
+partial overlap in between. Read as a genuine, if disappointing, result
+rather than declaring the earlier aggregation result confirmed just
+because it looked encouraging on its own.
+
+**Decision: look for an existing, validated dataset rather than keep
+deriving a storm-damage signal from general-purpose biomass products.**
+Both CCI and the in-house model have now each hit multiple distinct
+reliability problems across two pilot regions (Sierra terrain artifact,
+in-house tile seam, this ambiguous CCI/Hansen mismatch) - each new check
+has cost real effort for an inconclusive result. Searched for whether
+Hurricane Michael specifically already has a validated forest-damage
+product, since it's a well-studied, high-profile event.
+
+**Found**: St. Peter et al. (2020), *Remote Sensing* 12, 1138 -
+"Spatially Quantifying Forest Loss at Landscape Scale Following a Major
+Storm Event." Sentinel-2-based basal area loss map at 10m resolution for
+Hurricane Michael specifically, built from 248 pre-landfall field plots
+and ground-truthed against 70 post-storm revisit plots. Hosted on Dryad
+(doi:10.5061/dryad.905qfttgc) and Zenodo, ~7.5GB including the damage
+raster, source Sentinel-2 mosaics, and field plot data. A materially
+stronger ground truth than anything derived in-house from Hansen or CCI
+differencing - peer-reviewed, field-validated, and specific to this
+exact event rather than a general-purpose biomass product being
+repurposed.
+
+**Decision: use this dataset as the storm pilot's primary biomass-loss
+layer** (not just a validation cross-check), rather than continuing to
+fight CCI/in-house-model artifacts for this event. Basal area loss is a
+reasonable, directly interpretable proxy for the loss-share metric this
+project's curve-fitting method needs.
+
+**Scope, explicitly flagged**: this remains a single-event pilot
+(Hurricane Michael only), mirroring the drought pilot's single-event
+scope (California 2012-2016). The curve-fitting method itself (leave-
+one-event-out cross-validation) needs multiple events eventually -
+single-event work now is pilot/validation-stage, consistent with how
+the drought track has been scoped throughout, not an attempt to
+generalize across all storms yet.
+
+**Status**: dataset identified, not yet downloaded or integrated. Next
+step: pull the Dryad/Zenodo package, confirm it covers this project's
+Florida Panhandle AOI, and check its data format/structure before
+deciding how to fold it into the existing curve-fitting pipeline.
+
+## 18. St. Peter et al. dataset obtained and integrated - first clean storm signal
+
+**Access path, several real obstacles, each resolved**:
+- Dryad's direct download is behind an Anubis JavaScript proof-of-work
+  anti-bot challenge - `wget`/`curl` can't solve it (requires executing
+  JS). Fix: the same dataset is mirrored on **Zenodo**
+  (record 8237469), which allows direct downloads. Found via the
+  Zenodo API (`https://zenodo.org/api/records/<id>`) rather than
+  guessing the web UI's download path, after a first guess 403'd.
+- The archive bundles 4 files (7.5GB total) - only `Hurricane.gdb.zip`
+  (851MB) is needed; `Sentinel_norm_mosaics.zip` (6.67GB) is the
+  authors' own source imagery, not their output, and was skipped.
+- **The raster layers inside the `.gdb` could not be read by
+  `rasterio.open()` or by `gdal.OpenEx()` with the GDAL bundled in this
+  project's own venv (GDAL 3.12.2)**, nor by a fresh `conda-forge` GDAL
+  install (3.13.3, via `micromamba`, installed specifically to rule out
+  a venv-specific limitation) - both returned `None`/failed until the
+  actual bug was found: an earlier attempt used a path relative to the
+  wrong working directory (confusingly, failing in a way that looked
+  identical to "this GDAL build can't read FileGDB rasters at all").
+  Once run with the correct path, `gdal.OpenEx(..., gdal.OF_RASTER)`
+  **did** successfully list 4 raster subdatasets via the open-source
+  `OpenFileGDB` driver - `BAA_Pre_Hurricane`, `BAA_Post_Hurricane`,
+  `BAA_Diff_absolute_brnmsk`, `BAA_Diff_percent_brnmsk` (the "Diff"
+  rasters are the authors' own precomputed loss layers - exactly what's
+  needed, no further differencing required). Worth remembering for next
+  time: a GDAL "can't read this format" failure should be checked
+  against a plain path error first, before concluding the driver/library
+  itself is the problem.
+- Converted the two "Diff" subdatasets to plain GeoTIFFs with
+  `gdal_translate` (via the same `micromamba` environment, since the
+  OpenFileGDB raster driver worked there), after which they're readable
+  normally by this project's own `rasterio` install - no further need
+  for the extra environment once converted.
+- **A separate, serious infrastructure problem surfaced during this
+  work, unrelated to the dataset itself**: this notebook's Jupyter
+  kernel was discovered to have been running under the `fire-impact-
+  curves` project's Python venv and working directory this entire
+  session (confirmed via `sys.executable` pointing at
+  `~/fire-impact-curves/.venv/...`), not `climate_impact_curves`'s own
+  venv - despite the notebook file itself being correctly located.
+  `climate_impact_curves` had a venv on disk but no registered Jupyter
+  kernel for it; one had to be created
+  (`python -m ipykernel install --user --name climate_impact_curves`)
+  and manually selected in the notebook's kernel dropdown. **Every
+  relative-path operation in this notebook prior to the fix was
+  silently reading/writing `fire-impact-curves/data/raw/`, not this
+  project's own data folder** - worth checking the other notebooks
+  (01-04) for the same issue, not yet done.
+- Reading the full raster (`23040x16384` pixels) into memory at once
+  crashed the kernel - same class of memory problem as earlier large-
+  tile reads. Fixed by reprojecting the AOI bbox into the raster's own
+  CRS (`ESRI:102039`, USA Contiguous Albers - not EPSG:4326 like
+  everything else so far) and reading only a small windowed subset via
+  `rasterio.windows.from_bounds`, the same technique already used for
+  the ARCO-ERA5 pull (Section 13).
+- First plot looked like a near-uniform dark mass with no visible
+  structure - not a real result, just `imshow`'s default full min/max
+  color scaling being crushed by the data's heavy right-skew (min 0,
+  median 1, 95th percentile 77, max 422). Fixed by scaling the color
+  range to the 95th percentile instead of the full range.
+
+**Result: a clean, spatially coherent, physically plausible damage
+signal** - heaviest basal-area loss concentrated in the western/coastal
+part of the AOI and along the river corridor, tapering off toward the
+east. This matches Hurricane Michael's actual track (landfall near
+Mexico Beach, Bay County - the AOI's western/coastal side - weakening as
+it continued northeast inland). This is a materially cleaner result than
+anything obtained from CCI (Sections 6-9, 14, 17) or the in-house model
+(Sections 11-12) across either pilot region in this project so far.
+
+**Status**: dataset successfully integrated for the Florida AOI. Next
+steps: compare this spatial pattern against the earlier CCI (Section 17)
+and Hansen (Section 14-15) results for the same region as a final
+consistency check, then pair this loss layer with the ERA5 wind-gust
+data (Section 13, with its known intensity-underestimation caveat for
+compact storms) to actually fit the storm pilot's curve.
+
 ## Related work (literature review, 2026-11-17)
 
 Checked for existing published curves/functions before building our own,
@@ -593,11 +831,26 @@ already done elsewhere.
    a single-tile sub-region (Section 12) - ruling out AOI size/shape as a
    fix for CCI specifically, independent of how the in-house model's
    single-tile test turns out.
-10. Storm pilot's biomass signal (Section 14) is confounded by routine
-    plantation logging/salvage harvest, not cleanly isolable with a
-    single before/after year pair - needs a decision on year-pair choice
-    and a control/placebo check against undamaged plantation land before
-    trusting any curve.
+10. Storm pilot pivoted to St. Peter et al. (2020)'s validated Sentinel-2
+    basal-area-loss product, now obtained and integrated (Section 18) -
+    gives a clean, physically plausible signal for the Florida AOI. The
+    CCI 2017-2020 year-pair contamination question (previously item 10)
+    is now moot - this dataset replaces that approach.
+11. Storm pilot remains single-event (Hurricane Michael only), mirroring
+    drought's single-event scope (Section 17) - the curve-fitting
+    method's leave-one-event-out CV needs multiple events eventually;
+    this is pilot/validation-stage work, not a general storm model yet.
+12. **Notebook 05's Jupyter kernel was found (Section 18) to have been
+    running under `fire-impact-curves`'s venv and cwd for the entire
+    session**, not `climate_impact_curves`'s own - a registered kernel
+    for this project's venv didn't exist until created during this
+    session. Every relative-path file operation in notebook 05 before
+    the fix silently touched `fire-impact-curves/data/raw/` instead of
+    this project's own data folder. **Checked notebooks 01-04 for the
+    same issue (cwd/`sys.executable` diagnostic) - all four confirmed
+    correct**, running under `climate_impact_curves`'s own venv/cwd as
+    expected. The drought-pilot findings in Sections 6-12 are unaffected
+    - this was isolated to notebook 05.
 
 ## References
 
@@ -616,3 +869,7 @@ already done elsewhere.
   ForestGALES_BC.
 - Gardiner, B. et al. (2016). Review of wind damage to forests.
   (ForestGALES mechanistic wind-damage model.)
+- St. Peter, J. et al. (2020). Spatially Quantifying Forest Loss at
+  Landscape Scale Following a Major Storm Event. *Remote Sensing* 12(7),
+  1138. doi:10.3390/rs12071138. Data: Dryad,
+  doi:10.5061/dryad.905qfttgc.
