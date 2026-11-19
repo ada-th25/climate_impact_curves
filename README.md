@@ -755,12 +755,24 @@ it continued northeast inland). This is a materially cleaner result than
 anything obtained from CCI (Sections 6-9, 14, 17) or the in-house model
 (Sections 11-12) across either pilot region in this project so far.
 
-**Status**: dataset successfully integrated for the Florida AOI. Next
-steps: compare this spatial pattern against the earlier CCI (Section 17)
-and Hansen (Section 14-15) results for the same region as a final
-consistency check, then pair this loss layer with the ERA5 wind-gust
-data (Section 13, with its known intensity-underestimation caveat for
-compact storms) to actually fit the storm pilot's curve.
+**Status**: dataset successfully integrated for the Florida AOI.
+
+**Cross-check against Hansen passed (2026-11-19).** Converted the
+authors' percent-loss subdataset (`BAA_Diff_percent_brnmsk`) to GeoTIFF
+the same way as the absolute layer, reprojected it onto CCI's 100m grid
+via `reproject_to_grid` (so it's directly comparable to `disturbed_1819`,
+Section 14), and checked: mean St. Peter et al. percent loss inside
+Hansen-detected 2018+2019 disturbed pixels is **37.2%**, versus **13.5%**
+outside - a clear, large separation. This is the same independent
+consistency check that was inconclusive for CCI in Section 17 (hotspots
+didn't line up cleanly) - here it passes cleanly. Correlation with CCI's
+own AGB loss is weak (0.14), which isn't a concern given CCI was already
+established as unreliable for this region (Section 9, Section 17) - the
+point of this check was agreement with Hansen, not with CCI.
+
+**Next step**: pair this loss layer with the ERA5 wind-gust data
+(Section 13, with its known intensity-underestimation caveat for compact
+storms) to actually fit the storm pilot's curve.
 
 ## 19. Drought pilot unblocked: USFS ADS ground-truth mortality data found via an ArcGIS Online mirror
 
@@ -897,6 +909,49 @@ this pilot's current scope. Not a dead end in the same sense as Sections
 6-12 (CCI/in-house model) - the ground-truth data itself works and the
 confound is understood - but a sample-size limitation, not yet resolved.
 
+## 21. Storm curve attempt: ERA5 gust and the St. Peter et al. loss layer point in different spatial directions
+
+**Method**: paired the St. Peter et al. percent-loss layer (Section 18,
+cross-checked against Hansen and confirmed directionally correct) with
+ERA5 instantaneous 10m gust (Section 13) on ERA5's native 0.25deg grid
+over the Florida v2 AOI - 16 cells (4x4), a better sample size than
+drought's 8. Peak gust per cell computed over the 2018-10-09/11 landfall
+window; loss aggregated to the same cells via direct array slicing
+(GDAL's `reproject_to_grid` returned all-NaN at this extreme
+downsampling ratio - ~10m source pixels into 28km destination cells -
+for reasons not fully diagnosed; switched to manual inverse-affine
+array slicing instead, which worked and is more transparent for this
+kind of extreme-ratio aggregation anyway).
+
+**Result goes backwards, and the spatial pattern explains why.** The
+two highest-gust cells (34.8, 32.8 m/s - closest to actual landfall)
+show the *lowest* loss (5.6%, 4.3%); several lower-gust cells (26-28
+m/s) show the *highest* loss (up to 32.9%). This isn't a sign-convention
+bug - the loss layer's directionality was already independently
+validated against Hansen (Section 18: 37.2% mean loss inside
+Hansen-disturbed pixels vs. 13.5% outside). It's a spatial mismatch:
+Section 18 already documented the heaviest loss concentrated in the
+AOI's western/coastal side, tapering off toward the east; this ERA5
+gust grid shows peak gust increasing toward the *south-east* - opposite
+spatial gradients.
+
+**Consistent with ERA5's already-known limitation (Section 13), extended
+from magnitude to location.** Section 13 established ERA5's 0.25deg grid
+underestimates Michael's peak gust *magnitude* for this compact, intense
+storm. This result suggests the same coarseness also *mislocates* the
+wind field relative to where real damage occurred, not just softens its
+peak value - a reanalysis grid this coarse can't resolve a compact TC's
+eyewall position, not just its intensity.
+
+**Conclusion: fitting a curve against this gust grid as-is would fit
+misalignment, not a real intensity-damage relationship - not done.**
+Next step under consideration: replace the raw ERA5 gust grid with a
+distance-to-track proxy (using Michael's actual best-track position,
+e.g. from IBTrACS/HURDAT2, with a simple radial decay from the track),
+which ties the intensity metric directly to the storm's real physical
+position rather than a coarse reanalysis grid - a bounded, real task,
+not yet started.
+
 ## Related work (literature review, 2026-11-17)
 
 Checked for existing published curves/functions before building our own,
@@ -950,8 +1005,14 @@ already done elsewhere.
    (Section 5).
 5. Storm/wind dataset decided (ERA5 gust, Section 13) and timing-validated
    against Hurricane Michael, but ERA5's ~28km grid systematically
-   underestimates peak intensity for compact, intense storms - not yet
-   resolved how this should affect curve-fitting scope or bias-correction.
+   underestimates peak intensity for compact, intense storms. Extended
+   in Section 21: pairing ERA5 gust against the validated St. Peter et
+   al. loss layer went backwards (highest-gust cells showed the lowest
+   loss), and the spatial pattern shows why - ERA5's peak gust and the
+   documented damage gradient point in different directions, not just
+   different magnitudes. A distance-to-track proxy (IBTrACS/HURDAT2
+   position + radial decay) is under consideration as a replacement -
+   not yet built.
 6. USFS Aerial Detection Survey ground-truth data obtained for the
    pilot bbox/years via an ArcGIS Online mirror of CDFW BIOS DS2783
    (Section 19) - 9,916 features, 99.7% bark-beetle/drought-attributable.
