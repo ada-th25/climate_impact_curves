@@ -762,6 +762,65 @@ consistency check, then pair this loss layer with the ERA5 wind-gust
 data (Section 13, with its known intensity-underestimation caveat for
 compact storms) to actually fit the storm pilot's curve.
 
+## 19. Drought pilot unblocked: USFS ADS ground-truth mortality data found via an ArcGIS Online mirror
+
+**Context**: both CCI (Section 9) and the in-house model (Section 12) are
+exhausted for the Sierra Nevada site. Next step was always to get
+independent ground-truth mortality data instead of deriving it from
+general-purpose biomass products (Section 7, item 6).
+
+**The live national USFS ADS feature service only goes back to 2021.**
+Queried `EDW_InsectandDiseaseSurvey_01` (`apps.fs.usda.gov/ArcX/rest/
+services/EDW/...`) for the pilot bbox and 2012-2016 - got zero features
+back (`200`, empty `FeatureCollection`), which looked like "no data here"
+but was a silent filter mismatch: the field name is lowercase
+`survey_year`, not `SURVEY_YEAR` (confirmed via the layer's own `?f=json`
+metadata). Fixed the field name, still zero features - checked via
+`returnDistinctValues=true` on `survey_year` and found the live service
+only covers `[2021, 2022, 2023, 2024, 2025]`. The 2012-2016 data isn't
+in this service at all, not a query bug.
+
+**Found the correct historical dataset, but its usual host is
+unreachable.** The right record is CDFW BIOS **DS2783**, "Aerial Tree
+Death Report - 1973-2019 - USFS," which should cover 2012-2016. Its
+metadata pages and direct zip download all live on `filelib.wildlife.ca.gov`
+/ `filelib.fgc.ca.gov` - both refused the connection outright (`ECONNREFUSED`),
+from this session's own fetch tool *and* from a `curl` run directly on the
+Workbench terminal with a browser user-agent. This is a network-level
+block on that host (likely restricting traffic from cloud/datacenter IP
+ranges), not a bot-detection/user-agent issue like Dryad's Anubis
+challenge (Section 18) - no user-agent trick fixes it.
+
+**Resolution: the same dataset is mirrored as a live ArcGIS Online
+FeatureServer on a different, reachable host.** Found via web search for
+other BIOS datasets' service-naming convention (`biosds<id>_fpu`) and
+confirmed it holds DS2783:
+`https://services2.arcgis.com/Uq9r85Potqm3MfRV/ArcGIS/rest/services/biosds2783_fpu/FeatureServer/0`.
+Per-polygon fields include `RPT_YR`, `NO_TREES_TOTAL`, `TPA_Total`
+(trees per acre), `DMG_TYPE1-3`, `SEVERITY1-3`, `DCA1-3` (damage causal
+agent), `HOST1-3` (species), `FOR_TYPE1-3`, `ACRES`. Queried the pilot
+bbox (lon -119.5 to -118.5, lat 35.5 to 37.5) for `RPT_YR` 2012-2016:
+**9,916 features**, pulled in full via `resultOffset` pagination (server
+caps each response below the full count).
+
+**Causal-agent breakdown confirms this is genuinely the drought signal,
+not contaminated by fire or other disturbance**: of 9,916 features,
+9,885 (99.7%) are bark-beetle/drought-stress agents - western pine
+beetle (3,027), mountain pine beetle (2,513), fir engraver (1,785),
+explicit `"drought"` (1,103), Jeffrey pine beetle (924), and smaller
+counts of other insects/disease. Only 31 features (0.3%) are tagged
+`"Fire"`. No filtering needed to exclude fire contamination in this
+window.
+
+**Status**: ground-truth data obtained for the pilot bbox and years.
+Next step: convert `NO_TREES_TOTAL`/`TPA_Total`/`ACRES` per polygon into
+a continuous loss-share metric comparable across years and grid cells
+(not yet solved - this is a real cost of this approach vs. St. Peter et
+al.'s ready-made loss layer for storm, Section 18), then pair with the
+existing SPEI drought-severity data to fit the curve. See notebook
+`06_usfs_ads_pilot.ipynb` for the dead-end national-service query
+followed by the working ArcGIS Online pull.
+
 ## Related work (literature review, 2026-11-17)
 
 Checked for existing published curves/functions before building our own,
@@ -817,8 +876,11 @@ already done elsewhere.
    against Hurricane Michael, but ERA5's ~28km grid systematically
    underestimates peak intensity for compact, intense storms - not yet
    resolved how this should affect curve-fitting scope or bias-correction.
-6. USFS Aerial Detection Survey ground-truth comparison deliberately
-   deferred, not yet pulled in.
+6. USFS Aerial Detection Survey ground-truth data now obtained for the
+   pilot bbox/years via an ArcGIS Online mirror of CDFW BIOS DS2783
+   (Section 19) - 9,916 features, 99.7% bark-beetle/drought-attributable.
+   Converting this to a loss-share metric comparable to the SPEI data is
+   not yet done.
 7. In-house biomass model's tile-stitching seam (Section 11) is confirmed
    structural, not a seasonal artifact (Section 12) - tied to the pilot
    bbox spanning two UTM zones. A single-MGRS-tile rerun is in progress to
