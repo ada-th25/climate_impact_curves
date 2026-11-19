@@ -821,6 +821,82 @@ existing SPEI drought-severity data to fit the curve. See notebook
 `06_usfs_ads_pilot.ipynb` for the dead-end national-service query
 followed by the working ArcGIS Online pull.
 
+## 20. Pooled loss-share metric built and tested - confounded by forest-type/elevation, not drought; species-restricted version removes the confound but the pilot is too small to fit a curve
+
+**Method chosen**: defined loss share per SPEI grid cell (the pilot bbox
+sits on SPEI's native 0.5deg grid - 8 cells total, lon -119.25/-118.75 x
+lat 35.75/36.25/36.75/37.25) as a severity-weighted damaged-area
+fraction: `sum(ACRES_i x min(TPA_Total_i / 80, 1)) / forested_acres`,
+where 80 TPA is a literature-based severe-mortality ceiling (UC
+Cooperative Extension: 20-80 dead trees/acre in high-mortality Sierra
+areas) and `forested_acres` comes from NLCD 2016 (classes 41/42/43), not
+CCI - deliberately avoiding CCI's known terrain artifact (Section 9) in
+the denominator. A deliberate pivot from the original fire-impact-curves
+definition (a true biomass fraction) since ADS gives discrete tree
+counts/severity classes, not a continuous biomass value - flagged at
+decision time, not discovered as a problem later.
+
+**First result (pooled across all species) went the wrong direction.**
+Plotted against mean 2012-2016 SPEI-12 per cell (7 of 8 cells usable;
+one had near-zero NLCD forest cover, excluded to avoid a divide-by-zero):
+loss share *increased* as SPEI became less negative (less dry) - the
+opposite of what a drought-mortality relationship should show. Sharpest
+evidence of a problem: two adjacent cells at lat 37.25 with nearly
+identical SPEI (-0.722 vs -0.701) had a 25x difference in loss share
+(0.52 vs 0.02).
+
+**Diagnosed via species composition (`HOST1`) - confirmed confound, not
+a bug.** The high-loss cell is dominated by ponderosa pine (1,060
+polygons, 107,100 of its damaged acres) and other low/mid-elevation
+conifers; the low-loss cell is dominated by whitebark pine, lodgepole
+pine, and California red fir - high-elevation subalpine species with
+much lower per-polygon `TPA_Total` regardless of drought severity. A
+0.5deg SPEI cell can straddle a large elevation/forest-type gradient that
+the climate grid can't resolve, and which forest type dominates which
+cell is itself confounded with SPEI in this small 7-cell sample. This
+explains the wrong-direction pooled result without needing to distrust
+the underlying ADS data or the aggregation arithmetic (both checked and
+correct).
+
+**Species-restricted version (ponderosa pine only) removes most of the
+confound, but the pilot is too small to fit a curve from what's left.**
+Switched to mean `TPA_Total` (already a per-acre density, so no acreage
+denominator - and no LANDFIRE species-specific vegetation-type lookup -
+needed) for `HOST1 == "ponderosa pine"` polygons only, aggregated to the
+same grid cells. One cell had zero ponderosa polygons at all (the driest
+cell, SPEI -0.957 - plausibly elevation/moisture-band driven, ponderosa
+doesn't grow everywhere in this bbox) and one had only a single polygon
+(excluded as unreliable). The remaining 5 cells:
+
+| SPEI | mean TPA (ponderosa) |
+|---|---|
+| -0.856 | 21.98 |
+| -0.792 | 26.35 |
+| -0.722 | 25.94 |
+| -0.637 | 24.73 |
+| -0.453 | 23.26 |
+
+Mortality intensity now sits in a narrow band (~22-26 TPA) instead of
+swinging 30x like the pooled metric - confirms species/elevation
+composition was the main driver of the earlier wrong-direction result,
+not a flaw in the data or method. But the relationship across these 5
+points is not monotonic, and the SPEI range itself is narrow (-0.45 to
+-0.96). Plausible reading: within this bbox, drought severity was
+sufficient almost everywhere to push ponderosa mortality toward a
+saturation/epidemic response (bark-beetle outbreaks can become
+self-sustaining once established, killing at a fairly consistent rate
+somewhat independent of further small SPEI differences) - a real
+possible ecological finding, but not distinguishable from small-sample
+noise with only 5 points.
+
+**Conclusion: data quality and method are sound, but this single event
+and bbox do not contain enough SPEI range or grid cells to fit an actual
+dose-response curve.** Getting a real curve shape needs either a wider
+AOI (more SPEI cells, more spread) or more drought events - both beyond
+this pilot's current scope. Not a dead end in the same sense as Sections
+6-12 (CCI/in-house model) - the ground-truth data itself works and the
+confound is understood - but a sample-size limitation, not yet resolved.
+
 ## Related work (literature review, 2026-11-17)
 
 Checked for existing published curves/functions before building our own,
@@ -876,11 +952,15 @@ already done elsewhere.
    against Hurricane Michael, but ERA5's ~28km grid systematically
    underestimates peak intensity for compact, intense storms - not yet
    resolved how this should affect curve-fitting scope or bias-correction.
-6. USFS Aerial Detection Survey ground-truth data now obtained for the
+6. USFS Aerial Detection Survey ground-truth data obtained for the
    pilot bbox/years via an ArcGIS Online mirror of CDFW BIOS DS2783
    (Section 19) - 9,916 features, 99.7% bark-beetle/drought-attributable.
-   Converting this to a loss-share metric comparable to the SPEI data is
-   not yet done.
+   A loss-share metric was built and tested (Section 20): pooled across
+   species it went the wrong direction (forest-type/elevation confound,
+   diagnosed and confirmed); restricted to ponderosa pine alone the
+   confound mostly disappears, but only 5 usable grid cells with a
+   narrow SPEI range remain - not enough to fit an actual curve yet.
+   Needs a wider AOI or more drought events, not yet done.
 7. In-house biomass model's tile-stitching seam (Section 11) is confirmed
    structural, not a seasonal artifact (Section 12) - tied to the pilot
    bbox spanning two UTM zones. A single-MGRS-tile rerun is in progress to
