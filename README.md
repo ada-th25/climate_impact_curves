@@ -945,12 +945,67 @@ eyewall position, not just its intensity.
 
 **Conclusion: fitting a curve against this gust grid as-is would fit
 misalignment, not a real intensity-damage relationship - not done.**
-Next step under consideration: replace the raw ERA5 gust grid with a
-distance-to-track proxy (using Michael's actual best-track position,
-e.g. from IBTrACS/HURDAT2, with a simple radial decay from the track),
-which ties the intensity metric directly to the storm's real physical
-position rather than a coarse reanalysis grid - a bounded, real task,
-not yet started.
+Next step: replace the raw ERA5 gust grid with a distance-to-track
+proxy (using Michael's actual best-track position, e.g. from
+IBTrACS/HURDAT2, with a simple radial decay from the track), which ties
+the intensity metric directly to the storm's real physical position
+rather than a coarse reanalysis grid.
+
+## 22. Distance-to-track proxy recovers a real, physically sensible signal
+
+**Pulled Michael's actual best track from IBTrACS** (NOAA NA-basin CSV,
+filtered to `NAME == "MICHAEL"`, `SEASON == 2018`). Landfall point in
+the track data (2018-10-10 17:30 UTC, 30.0N/85.5W, 140kt) matches the
+documented Mexico Beach landfall almost exactly, and the peak recorded
+wind (140kt ~ 72 m/s) lines up with the ~69 m/s sustained-wind figure
+cited earlier (Section 13) - good confirmation the track data itself is
+trustworthy.
+
+**Computed distance-to-track per pixel on the CCI 100m grid** (haversine
+distance from each pixel to the nearest of Michael's track points),
+paired against the St. Peter et al. percent-loss layer. First attempt
+gave a nonsensical result (distances up to 16,204km, near-antipodal -
+impossible for a small Florida AOI): traced to a stale-variable bug, not
+a real finding - `dst_transform` had been left pointing at the 4x4 ERA5
+grid's transform from Section 21's aggregation step, and was
+accidentally reused here for the much larger CCI grid, extrapolating
+pixel coordinates wildly beyond that transform's valid domain. Fixed by
+assigning the CCI grid's own transform to a distinct variable name
+rather than reusing `dst_transform` across unrelated grids - a reminder
+to use fresh names per grid/resolution.
+
+**Corrected result is a real, physically sensible signal.** Distance
+range (0-98km) is now the right order of magnitude for this AOI. Mean
+percent loss by distance bin:
+
+| Distance bin (near to far) | Mean % loss |
+|---|---|
+| 1 (closest) | 24.7 |
+| 2 | 23.6 |
+| 3 | 27.7 |
+| 4 | 25.3 |
+| 5 | 19.5 |
+| 6 | 17.4 |
+| 7 | 12.2 |
+| 8 | 7.8 |
+| 9 | 5.5 |
+| 10 (farthest) | 2.7 |
+
+Loss stays roughly flat (~20-28%) within the first ~30-40km of the
+track - plausibly a near-eyewall saturation effect, similar in kind to
+the saturation hypothesis raised for drought in Section 20 - then falls
+off monotonically and substantially from there, dropping to under 3% at
+the farthest bin. This is the shape a storm-damage curve should have,
+and it's what ERA5 gust failed to show (Section 21).
+
+**Status**: the distance-to-track proxy works where ERA5 gust didn't.
+Not yet an actual fitted curve - still need to decide the final
+functional form and whether to keep distance itself as the intensity
+metric or convert it to an estimated wind speed via a parametric decay
+model (e.g. Holland 1980) combining distance and the track's recorded
+max wind, for better physical interpretability and consistency with how
+the drought curve is framed (an intensity measure, not a raw proximity
+measure). Single-event scope still applies (Section 7, item 11).
 
 ## Related work (literature review, 2026-11-17)
 
