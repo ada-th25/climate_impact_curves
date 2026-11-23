@@ -999,13 +999,39 @@ the farthest bin. This is the shape a storm-damage curve should have,
 and it's what ERA5 gust failed to show (Section 21).
 
 **Status**: the distance-to-track proxy works where ERA5 gust didn't.
-Not yet an actual fitted curve - still need to decide the final
-functional form and whether to keep distance itself as the intensity
-metric or convert it to an estimated wind speed via a parametric decay
-model (e.g. Holland 1980) combining distance and the track's recorded
-max wind, for better physical interpretability and consistency with how
-the drought curve is framed (an intensity measure, not a raw proximity
-measure). Single-event scope still applies (Section 7, item 11).
+
+## 23. Storm pilot curve fitted - first completed curve in this project
+
+**Method**: aggregated per-pixel loss into 12 fixed-width distance bins
+(0 to ~90km, matching the AOI's actual distance-to-track range),
+computed each bin's mean percent loss and pixel count, then fit a
+logistic decay function -
+`loss(d) = L_min + (L_max - L_min) / (1 + exp((d - d0) / k))` - to the
+12 binned points via `scipy.optimize.curve_fit`. Fitting on bin-level
+means (not raw pixels) keeps this consistent with how the drought curve
+was built (grid-cell-level points, not pixel-level noise).
+
+**Result**: `L_max = 26.04`, `L_min = 2.24`, `d0 = 49.86` km,
+`k = 9.43` km, **R-squared = 0.968** on the 12 binned points. Loss
+plateaus around 22-28% within roughly the first 30km of the track
+(plausibly near-eyewall saturation, the same kind of effect raised for
+drought in Section 20), falls off steeply between about 30-70km, and
+levels out near 2-3% beyond 70km. One bin at the far tail (82km, only
+2,009 pixels versus 20,000-94,000 in every other bin) sits slightly
+above its neighbour - a small-sample edge effect at the AOI boundary,
+not a real reversal, and doesn't meaningfully affect the fit.
+
+**This is the first completed loss-vs-intensity curve in this project**,
+for either hazard. Caveats to carry forward, all already flagged
+elsewhere: single-event scope (Hurricane Michael only, Section 7 item
+11); the intensity metric is distance-to-track, not wind speed directly
+- a reasonable, physically interpretable proxy for this storm, but not
+yet converted to an estimated wind speed via a parametric model (e.g.
+Holland 1980), which would be needed to generalise this curve to other
+storms with different wind-field profiles; and the loss layer itself
+(St. Peter et al.) is single-storm-specific by construction, built only
+for Michael, so applying this exact curve to a different storm isn't
+valid without new ground-truth loss data for that event.
 
 ## Related work (literature review, 2026-11-17)
 
