@@ -1165,6 +1165,65 @@ in the pilot to date: a real, consistently-signed, cross-species
 confirmed effect, with the caveat (repeated from above) that it explains
 a modest share of variance in every case, not a tight predictive curve.
 
+## 26. Storm curve converted to wind speed, with uncertainty bands and a spatial-holdout validation
+
+**Context**: Section 23's curve used distance-to-track as the intensity
+metric - physically interpretable for this storm, but not something that
+can be applied to a different storm's geometry. Converted it to an
+estimated wind speed instead, using each pixel's distance to its nearest
+point on Michael's track together with that track point's own recorded
+maximum wind and radius of maximum winds (RMW) from IBTrACS, via a
+modified Rankine vortex model (full recorded wind inside the RMW, a
+`(Rmax/r)^0.5` power-law decay outside it). Refit the same logistic form
+against binned wind speed instead of distance.
+
+**Result**: `L_max = 26.0`, `L_min = 2.2`, `w0 = 56.6` m/s (the inflection
+wind speed, roughly Category 3-4), `k` similarly tight, **R-squared =
+0.898** on the 12 binned points - slightly lower fit quality than the
+distance-based curve, expected since the Rankine vortex model is itself
+an approximation, but this version is the one that is structurally able
+to transfer to a different storm (a future event only needs its own
+recorded max wind and RMW, not a bespoke loss layer).
+
+**Added a 95% bootstrap uncertainty band** (500 resamples of the 12
+binned points, refit each time, with physically-sensible parameter
+bounds to prevent degenerate fits from distorting the band). The band is
+visibly wide at both the low and high end of the wind-speed range and
+narrower through the mid-range transition - i.e. we are much more
+confident about the shape of the transition itself than about the
+plateau values at either extreme.
+
+**Ran a spatial-holdout validation** (not a cross-storm one - no second
+dataset exists, per Section 23's caveats): split Michael's affected area
+into east/west halves by longitude, fit the curve on one half, and
+tested it against the other, both directions. Quantified this properly
+with an out-of-sample skill score (equivalent to R² computed on held-out
+data, benchmarked against a trivial "predict the training half's mean
+loss" baseline), not just an impression of the raw numbers:
+
+- East-fit predicting West: RMSE 9.70 (vs. 11.94 for the null baseline) -
+  **skill = 0.34**
+- West-fit predicting East: RMSE 7.34 (vs. 8.98 for the null baseline) -
+  **skill = 0.33**
+
+Both directions agree closely (0.34 and 0.33), which is reassuring -
+despite the two halves' fitted parameters disagreeing substantially
+(`L_max` was 14.7% in one half's fit vs. 26.0% in the other, and both
+hit the lower bound on `k`, a sign the fit is not tightly constrained
+with half the data), the actual out-of-sample prediction skill is stable
+across both directions.
+
+**Status: a real, positive, but modest validated skill (~0.33), not
+precise prediction.** Plain-language reading: the curve explains about a
+third of the loss variation on data it wasn't fit on, beyond just
+guessing the average - genuinely useful, clearly better than nothing,
+but roughly two-thirds of the variation in actual outcomes is not
+captured by it. This is the honest number to carry into any discussion
+of how much to trust this curve, rather than describing fit quality in
+words alone. Cross-storm generalisation remains untested and, per
+Section 23 and the Feng et al. (2021) precedent, is not expected to hold
+without new ground-truth data from a second storm.
+
 ## Related work (literature review, 2026-11-17)
 
 Checked for existing published curves/functions before building our own,
