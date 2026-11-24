@@ -1165,6 +1165,41 @@ in the pilot to date: a real, consistently-signed, cross-species
 confirmed effect, with the caveat (repeated from above) that it explains
 a modest share of variance in every case, not a tight predictive curve.
 
+**Update: validated with held-out data, using the same out-of-sample
+skill-score approach as the storm pilot (Section 26) rather than relying
+on in-sample p-values alone.** Two kinds of holdout, testing two
+different things, run on the ponderosa pine model:
+
+- **Leave-one-cell-out** (tests spatial generalisation, 19 folds):
+  median skill **0.28**, with 89% of held-out cells showing positive
+  skill - closely comparable to the storm pilot's own spatial-holdout
+  skill (~0.33). The relationship generalises well across locations.
+- **Leave-one-year-out** (tests temporal generalisation, 4 folds, one
+  per available year): skill ranged from **-1.08 to +0.46** across the
+  four years, two positive and two negative - clearly weaker and far
+  less consistent than the spatial check.
+
+**Reading this honestly**: the statistical significance above describes
+a real pattern in the pooled data, and the spatial holdout confirms that
+pattern transfers well across different locations. It does not, on its
+own, mean the model reliably predicts a *new year's* mortality - the
+year-level check shows that part is weak. The most likely explanation is
+sample size rather than a flawed mechanism: there are only 4-5 distinct
+years in this dataset, each a large, idiosyncratic block (its own overall
+severity, its own mix of surveyed cells), so leaving one out is a harder
+and noisier test than the 19-fold spatial check. **Net assessment: a
+real, spatially-generalising drought effect, with temporal
+generalisation still unproven given how few drought years are available
+- more years of ground-truth data (a different drought event) would be
+the direct fix, not further tuning of this one.**
+
+Saved and backed up alongside the storm pilot's outputs:
+`data/processed/drought_fits.csv` (per-species coefficients),
+`data/processed/drought_loo_by_year.csv` and `drought_loo_by_cell.csv`
+(both validation tables), `drought_cells_current.parquet`, and the
+prediction-with-confidence-band plot, synced to
+`gs://tree-fire-510209-data/climate-impact-curves/data/processed`.
+
 ## 26. Storm curve converted to wind speed, with uncertainty bands and a spatial-holdout validation
 
 **Context**: Section 23's curve used distance-to-track as the intensity
@@ -1223,6 +1258,20 @@ of how much to trust this curve, rather than describing fit quality in
 words alone. Cross-storm generalisation remains untested and, per
 Section 23 and the Feng et al. (2021) precedent, is not expected to hold
 without new ground-truth data from a second storm.
+
+**Also completed: biomass loss by local wind category** (the per-species
+drought plot's storm-side counterpart, both requested together). Rebinned
+the same `wind_estimate` values into Saffir-Simpson categories instead of
+continuous wind speed: mean loss rises from 12.1% (Cat 1) to 26.0% (Cat
+4), with two small, explainable dips rather than a clean monotonic climb
+- Cat 2 (6.3%) dips below Cat 1, consistent with the logistic curve's
+own known non-monotonic artefact (attributed to the Rankine vortex
+model's radial-symmetry assumption not capturing real storm-motion
+asymmetry); Cat 5 (23.2%) dips slightly below Cat 4, consistent with a
+small-sample edge effect (23,648 pixels vs. 242,097 in Cat 4), the same
+kind of tail-bin effect already seen in Section 23's distance-based
+curve. Caveat carried over unchanged: this is loss by local wind category
+within Michael only, not a cross-storm comparison.
 
 ## Related work (literature review, 2026-11-17)
 
