@@ -1033,6 +1033,54 @@ storms with different wind-field profiles; and the loss layer itself
 for Michael, so applying this exact curve to a different storm isn't
 valid without new ground-truth loss data for that event.
 
+## 24. Widened the drought AOI to the full Sierra Nevada range - more data, but a second confound surfaces, no curve yet
+
+**Context**: Section 20 concluded the pilot bbox gives only 5-7 usable
+grid cells, not enough to fit a curve, and needs either a wider AOI or
+more events. Tested the wider-AOI option directly.
+
+**Widening to the full Sierra Nevada range (lon -121.0 to -117.5, lat
+35.0 to 40.0) gives a large real increase in data**: 49,666 ADS
+mortality features (vs. 9,916 in the original bbox), spanning up to 70
+SPEI grid cells (vs. 8), of which 52 are actually touched by mortality
+data. Restricting to ponderosa pine alone (same species-level fix as
+Section 20) and requiring at least 5 polygons per cell for reliability
+gives **23 usable cells** - a real improvement in sample size over the
+original 5.
+
+**But a second, stronger confound surfaces at this larger scale.**
+Correlation of mean dead-trees-per-acre against mean SPEI-12 across
+these 23 cells is weak (0.21). Correlation against latitude is
+stronger (-0.37), and a scatter plot shows a clear hump shape peaking
+around 36.5-37.5N and falling off toward both the northern and
+southern edges of the range - consistent with the published pattern
+that bark-beetle mortality during this drought was concentrated in the
+central-southern Sierra (per the UC Cooperative Extension source cited
+in Section 20), not something local SPEI alone explains. This is a
+different, larger-scale version of the same kind of confound found in
+Section 20 (then: forest-type/elevation within a cell; now: a
+regional/latitude gradient across cells).
+
+**Checked whether a SPEI signal is hiding under the latitude effect:
+no.** Fit a quadratic trend of mean TPA against latitude, computed
+residuals, and checked their correlation against SPEI - only 0.26, and
+the residual-vs-SPEI scatter shows no visible pattern, just noise.
+Concluded this is a real negative result, not forced through to a
+curve: fitting one against data this weak would not hold up to
+scrutiny.
+
+**Status: widening the AOI alone does not fix the drought pilot.** It
+does confirm the ground-truth pipeline scales cleanly to a much larger
+area (49,666 features, consistent species/causal-agent behaviour), and
+it identifies a specific, explainable reason progress stalled - a
+regional mortality gradient, probably tied to elevation and/or local
+bark-beetle population dynamics more precisely than latitude alone
+captures, not local drought severity. Next step, not yet done: pull
+actual elevation (e.g. a DEM) per polygon as a covariate, rather than
+using latitude as a rough proxy, before concluding whether a real
+SPEI-mortality relationship exists once regional effects are properly
+controlled for.
+
 ## Related work (literature review, 2026-11-17)
 
 Checked for existing published curves/functions before building our own,
@@ -1102,7 +1150,13 @@ already done elsewhere.
    diagnosed and confirmed); restricted to ponderosa pine alone the
    confound mostly disappears, but only 5 usable grid cells with a
    narrow SPEI range remain - not enough to fit an actual curve yet.
-   Needs a wider AOI or more drought events, not yet done.
+   Widened the AOI to the full Sierra Nevada range (Section 24): gives
+   23 usable cells (up from 5), but surfaces a second, stronger
+   confound - a regional/latitude mortality gradient not explained by
+   local SPEI (corr. 0.21 vs. -0.37 for latitude), which persists (corr.
+   0.26) even after removing the latitude trend. Widening the AOI alone
+   does not fix this pilot. Needs actual elevation data per polygon as a
+   covariate, not yet done.
 7. In-house biomass model's tile-stitching seam (Section 11) is confirmed
    structural, not a seasonal artifact (Section 12) - tied to the pilot
    bbox spanning two UTM zones. A single-MGRS-tile rerun is in progress to
