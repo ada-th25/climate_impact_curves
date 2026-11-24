@@ -1081,6 +1081,90 @@ using latitude as a rough proxy, before concluding whether a real
 SPEI-mortality relationship exists once regional effects are properly
 controlled for.
 
+## 25. Drought: the real fix was a one-year lag, not elevation - a real, significant (but noisy) SPEI effect confirmed
+
+**Context**: Section 24 found that widening the AOI surfaced a regional/
+latitude confound and that a residual check found no SPEI signal hiding
+underneath it. Elevation was flagged as the likely next covariate to try.
+
+**Elevation does not explain the pattern.** Pulled mean elevation per
+grid cell (SRTM DEM via Earth Engine) and regressed mean TPA on SPEI and
+elevation together: neither coefficient was significant (SPEI p=0.246,
+elevation p=0.197), and the model as a whole did not explain more than
+chance (R²=0.123, p=0.268). Elevation was a reasonable guess but not the
+right one.
+
+**The actual problem was a timing mismatch, not a missing covariate.**
+The ADS data has a per-polygon survey year (`RPT_YR`, 2012-2016), but the
+SPEI value used throughout Sections 20/24 was a single static 2012-2016
+mean applied to every polygon regardless of its actual year - so a 2012
+polygon and a 2016 polygon in the same grid cell were being compared
+against an identical SPEI number. Bark-beetle-driven mortality (99.7% of
+this dataset, per Section 19) typically shows up roughly a year after the
+triggering drought stress, not in the same year the stress occurred, so
+same-year SPEI was never the right thing to pair against this mortality
+data in the first place.
+
+**Fix: built a per-(cell, year) panel (75 usable observations, up from
+23) with properly year-matched SPEI**, including both a same-year and a
+lag-1 (prior year) version. Regressing mean TPA against SPEI and the
+latitude quadratic (to keep controlling for the regional pattern from
+Section 24):
+- **Same-year SPEI: positive and significant (+6.53, p<0.001)** - the
+  wrong direction, confirming the mismatch was real.
+- **Lag-1 SPEI: negative and significant (-3.25, p=0.001)** - the
+  expected direction. Survives a stricter check using cell-clustered
+  standard errors (to account for the same grid cell appearing in
+  multiple years, which are not independent observations): coefficient
+  unchanged, p<0.0005.
+
+That same-year comes out backwards while lag-1 comes out correctly
+signed, in the same dataset, is itself evidence this is a real lagged
+mechanism and not noise - it is the specific pattern a one-year
+mortality lag would produce.
+
+**Status: a genuine, statistically defensible drought effect, but a
+noisy one, not yet a clean predictive curve.** R²=0.279 for the lag-1
+model - prior-year SPEI explains well under a third of the variance even
+after controlling for latitude. Plotting mean TPA against lag-1 SPEI with
+the latitude effect removed from both axes shows a real downward slope
+but with substantial scatter around it (visible by eye, not just a
+statistical artifact of a small sample). Honest framing for this: this is
+the first usable drought result in the pilot (a confirmed, correctly
+signed, correctly timed effect of a plausible size), not a tight
+dose-response curve ready to put a confidence band on. A direct fitted
+prediction curve (predicted mean TPA vs. SPEI at fixed representative
+latitude) and a per-species breakdown of the same lag-1 effect are the
+natural next outputs, not yet built as of this entry.
+
+**Update: per-species breakdown confirms the effect generalizes across
+species, not just ponderosa.** Repeated the same panel approach (lag-1
+SPEI, latitude-controlled, cell-clustered standard errors) for the five
+next-most-abundant host species in the widened AOI, using
+`severity_weight` (the capped loss metric) rather than raw TPA so species
+are compared on the same bounded scale:
+
+| Species | n (cell-years) | lag-1 SPEI coef. | p-value | R² |
+|---|---|---|---|---|
+| Ponderosa pine | 75 | -0.040 | 1.9e-08 | 0.29 |
+| White fir | 79 | -0.021 | 4.0e-03 | 0.14 |
+| Jeffrey pine | 86 | -0.021 | 6.5e-05 | 0.20 |
+| Lodgepole pine | 71 | -0.007 | 3.8e-05 | 0.07 |
+| Sugar pine | 49 | -0.012 | 1.7e-02 | 0.15 |
+| California red fir | 62 | -0.014 | 2.5e-05 | 0.19 |
+
+All six are negative and significant, the same direction and the same
+general shape (noisy but real), which is strong evidence the lag-1
+mechanism is a genuine ecological effect rather than a fluke of
+ponderosa's particular sample. Effect size and fit quality vary by
+species (ponderosa shows both the largest coefficient and the best R²),
+which is itself a plausible, reportable finding - species differ in
+drought sensitivity, consistent with known differences in rooting depth
+and bark-beetle host preference. This is the most complete drought result
+in the pilot to date: a real, consistently-signed, cross-species
+confirmed effect, with the caveat (repeated from above) that it explains
+a modest share of variance in every case, not a tight predictive curve.
+
 ## Related work (literature review, 2026-11-17)
 
 Checked for existing published curves/functions before building our own,
