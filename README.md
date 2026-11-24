@@ -1200,6 +1200,64 @@ Saved and backed up alongside the storm pilot's outputs:
 prediction-with-confidence-band plot, synced to
 `gs://tree-fire-510209-data/climate-impact-curves/data/processed`.
 
+**Update: extended to the full available ADS record (1993-2019, not just
+2012-2016) to get more distinct years for a fairer temporal validation -
+this revealed the effect is not robust, reversing the conclusion above.**
+
+The ADS mirror (`biosds2783_fpu`) turns out to cover annual surveys
+1993-2019 (plus two isolated earlier years, 1973 and 1978, not used),
+far more than the 2012-2016 drought window used throughout Sections
+20-25. Re-pulled the same widened AOI across this full range: 173,112
+features, 54 distinct cells, 212 unique (cell, year) combinations for
+ponderosa pine alone, giving 176 usable panel rows across 11 distinct
+years (vs. 75 rows / 4 years before).
+
+**Re-running the same lag-1 SPEI regression (latitude-controlled,
+cell-clustered SE) on this bigger panel**: `spei_lag1` stays negative and
+significant (coef -0.037, p=0.001) - same direction as Section 25,
+reassuring on its own. But R-squared drops sharply, from 0.14-0.29 in the
+narrow window to **0.031** here - a much smaller apparent effect once
+more than one drought episode and more varied conditions are included.
+
+**Re-running both held-out validations on this bigger panel, both got
+markedly worse, not better:**
+- Leave-one-cell-out (22 folds): median skill fell from 0.28 to
+  **0.033**, positive fraction fell from 89% to 59%.
+- Leave-one-year-out (now 9 usable folds instead of 4, a fairer test):
+  median skill **-0.10**, only 44% of years positive - worse than the
+  already-weak 4-year version.
+
+**The decisive check: adding year fixed effects (to separate "this year
+was bad everywhere" from "SPEI explains where mortality concentrated
+within a year") flips the SPEI coefficient's sign.** With year dummies
+added, `spei_lag1` becomes **positive** (+0.076, p=0.021) - the wrong
+direction, the same backwards sign originally found in the very first
+pooled attempt back in Section 20, not the correctly-signed effect
+Section 25 reported. A coefficient that reverses sign depending on which
+years are included and which controls are used is the signature of an
+unstable, non-robust result, not a genuine, stable relationship - the
+latitude/regional structure is consistently strong and significant
+across every specification tried, but the specific SPEI effect is not.
+
+**Status: no usable, trustworthy drought curve as of this entry,
+superseding the more optimistic framing in the update above.** This is
+the honest conclusion after substantial validation effort, not a failure
+of that effort - the whole point of out-of-sample testing and robustness
+checks is to catch exactly this kind of fragile result before it gets
+presented as settled. Plausible explanations, none yet investigated:
+SPEI-12 at 0.5-degree resolution may be too coarse or the wrong drought
+index for this ground-truth data; there may be a real confound still
+unaccounted for (beetle population dynamics, fire history, stand density
+changes over a 27-year span); or the 2012-2016-specific result may
+reflect a genuine but narrow, episode-specific relationship that doesn't
+hold as a general multi-decade law. Resolving this would need either a
+fundamentally different modelling approach (e.g. a proper panel model
+built around these confounds, not just year dummies bolted onto the
+existing specification) or accepting a narrower, explicitly-scoped claim
+(valid for the 2012-2016 episode only, not a general drought-mortality
+curve) - a decision for the supervisor, not something to resolve by
+continuing to iterate on specifications.
+
 ## 26. Storm curve converted to wind speed, with uncertainty bands and a spatial-holdout validation
 
 **Context**: Section 23's curve used distance-to-track as the intensity
